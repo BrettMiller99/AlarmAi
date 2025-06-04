@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="alarms">
+
+    <!-- Alarms List Screen -->
+    <fragment
+        android:id="@+id/alarms"
+        android:name="com.example.smartalarm.ui.alarm.AlarmsListScreen"
+        android:label="@string/app_name"
+        tools:layout="@layout/fragment_alarms_list">
+        <action
+            android:id="@+id/action_alarms_to_add_edit"
+            app:destination="@id/addEditAlarm" />
+    </fragment>
+
+    <!-- Add/Edit Alarm Screen -->
+    <fragment
+        android:id="@+id/addEditAlarm"
+        android:name="com.example.smartalarm.ui.alarm.AddEditAlarmScreen"
+        android:label="@string/add_alarm"
+        tools:layout="@layout/fragment_add_edit_alarm">
+        <argument
+            android:name="alarmId"
+            android:defaultValue="-1"
+            app:argType="integer" />
+    </fragment>
+
+    <!-- Settings Screen -->
+    <fragment
+        android:id="@+id/settings"
+        android:name="com.example.smartalarm.ui.settings.SettingsScreen"
+        android:label="@string/settings"
+        tools:layout="@layout/fragment_settings" />
+
+</navigation>

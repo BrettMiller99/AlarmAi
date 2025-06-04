@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- Include all shared preferences except those with auth tokens -->
+        <include domain="sharedpref" path="."/>
+        <exclude domain="sharedpref" path="tokens.xml"/>
+    </cloud-backup>
+    <device-transfer>
+        <!-- Include all shared preferences except those with auth tokens -->
+        <include domain="sharedpref" path="."/>
+        <exclude domain="sharedpref" path="tokens.xml"/>
+        
+        <!-- Include all databases -->
+        <include domain="database" path="."/>
+    </device-transfer>
+</data-extraction-rules>
