@@ -6,14 +6,14 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.example.smartalarm.data.local.dao.AlarmDao
-import com.example.smartalarm.data.local.converter.Converters
-import com.example.smartalarm.domain.model.Alarm
+import com.example.smartalarm.data.model.AlarmEntity
+import com.example.smartalarm.util.Converters
 
 /**
  * The Room database for this app.
  */
 @Database(
-    entities = [Alarm::class],
+    entities = [AlarmEntity::class],
     version = 1,
     exportSchema = false
 )
@@ -33,7 +33,7 @@ abstract class AppDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
-                    "smart_alarm_database"
+                    "alarm_database"
                 )
                 .fallbackToDestructiveMigration()
                 .build()

@@ -15,75 +15,204 @@ import java.time.LocalTime
  * @property destinationAddress The destination address for traffic calculation
  * @property destinationLat Latitude of the destination (optional, can be set later)
  * @property destinationLng Longitude of the destination (optional, can be set later)
- * @property lastCalculatedDepartureTime The last calculated time to depart based on traffic
- * @property isRecurring Whether the alarm repeats on specific days
- * @property daysOfWeek Set of days (1-7, where 1 is Sunday) when the alarm should be active
- * @property isVibrate Whether the alarm should vibrate
- * @property ringtoneUri URI of the ringtone to play
- * @property volume Volume level (0.0 to 1.0)
- * @property isIncreasingVolume Whether the volume should gradually increase
- * @property createdTimestamp When the alarm was created
- * @property updatedTimestamp When the alarm was last updated
+ * @property lastTriggered When the alarm was last triggered
+ * @property created When the alarm was created
+ * @property modified When the alarm was last modified
  */
+@Parcelize
 @Entity(tableName = "alarms")
 data class Alarm(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
-    val name: String,
+    val time: LocalTime = LocalTime.now(),
+    val days: Set<DayOfWeek> = emptySet(),
     val isEnabled: Boolean = true,
-    val targetArrivalTime: LocalTime,
-    val travelBufferMinutes: Int = 15,
-    val destinationAddress: String,
-    val destinationLat: Double? = null,
-    val destinationLng: Double? = null,
-    val lastCalculatedDepartureTime: LocalTime? = null,
-    val isRecurring: Boolean = false,
-    val daysOfWeek: Set<Int> = emptySet(),
+    val label: String = "Alarm",
     val isVibrate: Boolean = true,
-    val ringtoneUri: String = "",
-    val volume: Float = 0.8f,
-    val isIncreasingVolume: Boolean = true,
-    val createdTimestamp: Long = System.currentTimeMillis(),
-    val updatedTimestamp: Long = System.currentTimeMillis()
-) {
+    val soundUri: String = "",
+    val volume: Int = Constants.DEFAULT_ALARM_VOLUME,
+    val isSmart: Boolean = false,
+    val destination: String = "",
+    val travelMode: String = Constants.DEFAULT_TRAVEL_MODE,
+    val bufferMinutes: Int = Constants.DEFAULT_ALARM_BUFFER_MINUTES,
+    val lastTriggered: Long = 0,
+    val created: Long = System.currentTimeMillis(),
+    val modified: Long = System.currentTimeMillis()
+) : Parcelable {
+    
     /**
-     * Returns the next occurrence of the alarm time from the given time.
-     * If the alarm is not recurring, returns the next occurrence of the target time.
-     * If the alarm is recurring, returns the next occurrence based on the selected days.
+     * Returns the formatted time string in 24-hour format (HH:MM)
      */
-    fun getNextAlarmTime(fromTime: java.time.LocalDateTime = java.time.LocalDateTime.now()): java.time.LocalDateTime {
-        val timePart = targetArrivalTime
-        var nextDateTime = fromTime.toLocalDate().atTime(timePart)
-        
-        // If the time has already passed today, move to next day
-        if (nextDateTime.isBefore(fromTime)) {
-            nextDateTime = nextDateTime.plusDays(1)
+    val formattedTime: String
+        get() = String.format("%02d:%02d", time.hour, time.minute)
+    
+    /**
+     * Returns a user-friendly string representation of the repeat days
+     */
+    val daysText: String
+        get() = when {
+            days.isEmpty() -> "Never"
+            days.size == 7 -> "Every day"
+            days.containsAll(setOf(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY)) && days.size == 2 -> "Weekends"
+            days.containsAll(weekdays) && days.size == 5 -> "Weekdays"
+            else -> days.sortedBy { it.value }
+                .joinToString(separator = ", ") { it.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault()) }
         }
-        
-        if (!isRecurring) {
-            return nextDateTime
+    
+    /**
+     * Returns true if this is a repeating alarm
+     */
+    val isRepeating: Boolean
+        get() = days.isNotEmpty()
+    
+    /**
+     * Returns true if this is a one-time alarm
+     */
+    val isOneTime: Boolean
+        get() = days.isEmpty()
+    
+    /**
+     * Returns a set of weekdays for convenience
+     */
+    private val weekdays = setOf(
+        DayOfWeek.MONDAY,
+        DayOfWeek.TUESDAY,
+        DayOfWeek.WEDNESDAY,
+        DayOfWeek.THURSDAY,
+        DayOfWeek.FRIDAY
+    )
+    
+    /**
+     * Toggles a specific day in the repeat days set
+     */
+    fun toggleDay(day: DayOfWeek): Alarm {
+        return if (days.contains(day)) {
+            copy(days = days - day, modified = System.currentTimeMillis())
+        } else {
+            copy(days = days + day, modified = System.currentTimeMillis())
         }
-        
-        // For recurring alarms, find the next matching day of week
-        while (nextDateTime.dayOfWeek.value !in daysOfWeek) {
-            nextDateTime = nextDateTime.plusDays(1)
-        }
-        
-        return nextDateTime
     }
     
     /**
-     * Returns true if the alarm should be active on the given day of week.
-     * @param dayOfWeek 1-7 where 1 is Sunday
+     * Toggles the alarm's enabled state
      */
-    fun isActiveOnDay(dayOfWeek: Int): Boolean {
-        return !isRecurring || dayOfWeek in daysOfWeek
+    fun toggle(): Alarm = copy(
+        isEnabled = !isEnabled,
+        modified = System.currentTimeMillis()
+    )
+    
+    /**
+     * Updates the alarm time
+     */
+    fun updateTime(hour: Int, minute: Int): Alarm {
+        return copy(
+            time = LocalTime.of(hour, minute),
+            modified = System.currentTimeMillis()
+        )
     }
     
     /**
-     * Creates a copy of the alarm with the specified enabled state.
+     * Updates the alarm label
      */
-    fun copyWithEnabled(enabled: Boolean): Alarm {
-        return this.copy(isEnabled = enabled, updatedTimestamp = System.currentTimeMillis())
+    fun updateLabel(label: String): Alarm {
+        return copy(
+            label = label.ifEmpty { "Alarm" },
+            modified = System.currentTimeMillis()
+        )
+    }
+    
+    /**
+     * Toggles vibration for the alarm
+     */
+    fun toggleVibration(): Alarm {
+        return copy(
+            isVibrate = !isVibrate,
+            modified = System.currentTimeMillis()
+        )
+    }
+    
+    /**
+     * Updates the alarm volume
+     */
+    fun updateVolume(volume: Int): Alarm {
+        return copy(
+            volume = volume.coerceIn(0, 100),
+            modified = System.currentTimeMillis()
+        )
+    }
+    
+    /**
+     * Updates the alarm sound
+     */
+    fun updateSound(soundUri: String): Alarm {
+        return copy(
+            soundUri = soundUri,
+            modified = System.currentTimeMillis()
+        )
+    }
+    
+    /**
+     * Toggles smart alarm feature
+     */
+    fun toggleSmartAlarm(): Alarm {
+        return copy(
+            isSmart = !isSmart,
+            modified = System.currentTimeMillis()
+        )
+    }
+    
+    /**
+     * Updates the destination for smart alarm
+     */
+    fun updateDestination(destination: String): Alarm {
+        return copy(
+            destination = destination,
+            modified = System.currentTimeMillis()
+        )
+    }
+    
+    /**
+     * Updates the travel mode for smart alarm
+     */
+    fun updateTravelMode(mode: String): Alarm {
+        return copy(
+            travelMode = mode,
+            modified = System.currentTimeMillis()
+        )
+    }
+    
+    /**
+     * Updates the buffer minutes for smart alarm
+     */
+    fun updateBufferMinutes(minutes: Int): Alarm {
+        return copy(
+            bufferMinutes = minutes.coerceIn(
+                Constants.MIN_BUFFER_MINUTES,
+                Constants.MAX_BUFFER_MINUTES
+            ),
+            modified = System.currentTimeMillis()
+        )
+    }
+    
+    /**
+     * Marks the alarm as triggered now
+     */
+    fun markTriggered(): Alarm {
+        return copy(
+            lastTriggered = System.currentTimeMillis(),
+            modified = System.currentTimeMillis()
+        )
+    }
+    
+    companion object {
+        /**
+         * Creates a new default alarm with the next available ID
+         */
+        fun createDefault(): Alarm {
+            return Alarm(
+                label = "Alarm",
+                time = LocalTime.now().plusMinutes(30) // Default to 30 minutes from now
+            )
+        }
     }
 }
